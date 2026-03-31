@@ -54,7 +54,9 @@ def build_encoding_map(
         save_cache(cache, cache_path)
         print(f"  Cache saved → {cache_path}\n")
 
-    return cache
+    # Return only entries for the current folders, ignoring stale cache paths
+    current_keys = {str(f) for f in folders}
+    return {k: v for k, v in cache.items() if k in current_keys}
 
 
 # ---------------------------------------------------------------------------
