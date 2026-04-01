@@ -33,6 +33,7 @@ def build_encoding_map(
     folders: list[Path],
     cache_path: str,
     sample_rate: int,
+    debug_dir: str | None = None,
 ) -> dict[str, list]:
     """Return {folder_str: [encodings]} for every sub-folder, using cache."""
     cache = load_cache(cache_path)
@@ -45,7 +46,7 @@ def build_encoding_map(
             continue
 
         print(f"  [scan]  {folder.name} … ", end="", flush=True)
-        encodings = get_face_encodings_from_folder(key, sample_rate)
+        encodings = get_face_encodings_from_folder(key, sample_rate, debug_dir)
         print(f"{len(encodings)} face(s) found")
         cache[key] = encodings
         changed = True
@@ -126,6 +127,8 @@ def main() -> None:
                         help="Path to encoding cache JSON (default: cache/encodings.json)")
     parser.add_argument("--dry-run", action="store_true",
                         help="Preview moves without executing them")
+    parser.add_argument("--debug", metavar="DIR", nargs="?", const="debug_frames",
+                        help="Save sampled video frames to DIR (default: debug_frames)")
     args = parser.parse_args()
 
     target_dir = Path(args.target_dir).resolve()
@@ -142,7 +145,7 @@ def main() -> None:
 
     # 1. Extract / load encodings
     print("=== Step 1: Extracting face encodings ===")
-    encoding_map = build_encoding_map(folders, args.cache, args.sample_rate)
+    encoding_map = build_encoding_map(folders, args.cache, args.sample_rate, args.debug)
 
     # 2. Build graph & cluster
     print("=== Step 2: Building association graph ===")

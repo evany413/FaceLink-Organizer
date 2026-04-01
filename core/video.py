@@ -1,6 +1,8 @@
-import cv2
+import av
+import hashlib
 import numpy as np
 from pathlib import Path
+from PIL import Image
 from deepface import DeepFace
 
 SUPPORTED_IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
@@ -13,8 +15,9 @@ DETECTOR_BACKEND = "retinaface"
 def get_face_encodings_from_image(image_path: str) -> list[np.ndarray]:
     """Extract face embeddings from an image using DeepFace."""
     try:
+        img = np.array(Image.open(image_path).convert("RGB"))
         results = DeepFace.represent(
-            img_path=image_path,
+            img_path=img,
             model_name=MODEL_NAME,
             detector_backend=DETECTOR_BACKEND,
             enforce_detection=False,
@@ -25,28 +28,35 @@ def get_face_encodings_from_image(image_path: str) -> list[np.ndarray]:
         return []
 
 
-def get_face_encodings_from_video(video_path: str, sample_rate: int = 30) -> list[np.ndarray]:
+def get_face_encodings_from_video(
+    video_path: str, sample_rate: int = 30, debug_dir: str | None = None
+) -> list[np.ndarray]:
     """Sample frames from a video and extract face embeddings using DeepFace."""
-    cap = cv2.VideoCapture(video_path)
-    sar_num = cap.get(cv2.CAP_PROP_SAR_NUM)
-    sar_den = cap.get(cv2.CAP_PROP_SAR_DEN)
-    apply_sar = sar_num > 0 and sar_den > 0 and sar_num != sar_den
     encodings = []
     frame_count = 0
 
-    while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            break
+    try:
+        container = av.open(video_path)
+    except Exception:
+        return []
 
-        if apply_sar:
-            new_w = int(frame.shape[1] * sar_num / sar_den)
-            frame = cv2.resize(frame, (new_w, frame.shape[0]))
+    if debug_dir:
+        debug_path = Path(debug_dir)
+        debug_path.mkdir(parents=True, exist_ok=True)
+        p = Path(video_path)
+        parent_hash = hashlib.md5(str(p.parent).encode()).hexdigest()[:6]
+        stem = f"{parent_hash}_{p.stem}"
 
+    for frame in container.decode(video=0):
         if frame_count % sample_rate == 0:
             try:
+                img = frame.to_ndarray(format="bgr24")
+
+                if debug_dir:
+                    Image.fromarray(img[..., ::-1]).save(debug_path / f"{stem}_f{frame_count}.jpg")
+
                 results = DeepFace.represent(
-                    img_path=frame,
+                    img_path=img,
                     model_name=MODEL_NAME,
                     detector_backend=DETECTOR_BACKEND,
                     enforce_detection=False,
@@ -55,14 +65,15 @@ def get_face_encodings_from_video(video_path: str, sample_rate: int = 30) -> lis
                 encodings.extend(found)
             except Exception:
                 pass
-
         frame_count += 1
 
-    cap.release()
+    container.close()
     return encodings
 
 
-def get_face_encodings_from_folder(folder_path: str, sample_rate: int = 30) -> list[np.ndarray]:
+def get_face_encodings_from_folder(
+    folder_path: str, sample_rate: int = 30, debug_dir: str | None = None
+) -> list[np.ndarray]:
     """Scan a folder recursively and extract face encodings from all supported files."""
     folder = Path(folder_path)
     all_encodings: list[np.ndarray] = []
@@ -73,7 +84,7 @@ def get_face_encodings_from_folder(folder_path: str, sample_rate: int = 30) -> l
             if ext in SUPPORTED_IMAGE_EXTS:
                 all_encodings.extend(get_face_encodings_from_image(str(file)))
             elif ext in SUPPORTED_VIDEO_EXTS:
-                all_encodings.extend(get_face_encodings_from_video(str(file), sample_rate))
+                all_encodings.extend(get_face_encodings_from_video(str(file), sample_rate, debug_dir))
         except Exception as e:
             print(f"  [WARN] Failed to process {file}: {e}")
 
