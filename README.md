@@ -26,6 +26,15 @@ powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 
 > **Note:** This project uses `retinaface` and `Facenet512` via DeepFace. The first run will download model weights automatically.
 
+### GPU Acceleration (Windows / Linux)
+
+NVIDIA GPU is supported automatically via TensorFlow. No code changes are needed — TF detects CUDA at runtime and falls back to CPU if unavailable.
+
+To enable GPU:
+1. Install the latest [NVIDIA driver](https://www.nvidia.com/drivers)
+2. Install [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) (11.2+)
+3. Install [cuDNN](https://developer.nvidia.com/cudnn)
+
 ### Installation
 
 ```bash
