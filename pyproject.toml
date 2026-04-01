@@ -5,13 +5,9 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "face-recognition>=1.3.0",
-    "face-recognition-models",
+    "deepface>=0.0.99",
     "networkx>=3.6.1",
     "numpy>=2.4.4",
     "opencv-python>=4.13.0.92",
-    "setuptools<71",
+    "tf-keras>=2.21.0",
 ]
-
-[tool.uv.sources]
-face-recognition-models = { git = "https://github.com/ageitgey/face_recognition_models" }
