@@ -24,7 +24,7 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
-> **Note:** This project uses `dlib` under the hood. Make sure `cmake` and a C++ compiler are available on your system before installing.
+> **Note:** This project uses `retinaface` and `Facenet512` via DeepFace. The first run will download model weights automatically.
 
 ### Installation
 
@@ -52,11 +52,12 @@ uv run main.py /path/to/folders
 | `--sample-rate` | `30` | Video frame sampling interval |
 | `--cache` | `cache/encodings.json` | Path to encoding cache file |
 | `--dry-run` | — | Preview moves without executing them |
+| `--debug [DIR]` | `debug_frames/` | Save sampled video frames for inspection |
 
 ## How It Works
 
 1. **Scan** — Collects all immediate subdirectories of the target path.
-2. **Extract** — Processes images and sampled video frames to generate 128-d face encodings, saving results to a local cache.
+2. **Extract** — Processes images and sampled video frames to generate 512-d face embeddings (Facenet512), saving results to a local cache.
 3. **Match** — Computes Euclidean distance between encodings; a distance ≤ `tolerance` is considered a match.
 4. **Graph** — Each folder becomes a node; an edge is drawn between two nodes if they share at least one face.
 5. **Cluster** — `nx.connected_components()` finds all groups of directly or indirectly linked folders.
@@ -66,8 +67,9 @@ uv run main.py /path/to/folders
 
 | Role | Library |
 |---|---|
-| Face recognition | `face_recognition` (dlib ResNet) |
-| Video processing | `opencv-python` |
+| Face detection & embedding | `deepface` (Facenet512 + RetinaFace) |
+| Video decoding | `av` (PyAV / FFmpeg) |
+| Image loading | `Pillow` |
 | Graph clustering | `networkx` |
 | Environment | `uv` |
 
