@@ -24,18 +24,41 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 ```
 
-> **Note:** This project uses `retinaface` and `Facenet512` via DeepFace. The first run will download model weights automatically.
-
-### GPU Acceleration (Windows / Linux)
-
-NVIDIA GPU is supported automatically via TensorFlow. No code changes are needed — TF detects CUDA at runtime and falls back to CPU if unavailable.
-
-To enable GPU:
-1. Install the latest [NVIDIA driver](https://www.nvidia.com/drivers)
-2. Install [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) (11.2+)
-3. Install [cuDNN](https://developer.nvidia.com/cudnn)
+> **Note:** The first run will download model weights (`vggface2` via facenet-pytorch) automatically.
 
 ### Installation
+
+**Mac (Apple Silicon / Intel) or CPU-only:**
+
+Before running `uv sync`, comment out the two CUDA blocks at the bottom of `pyproject.toml`:
+
+```toml
+# [[tool.uv.index]]
+# name = "pytorch-cu121"
+# url = "https://download.pytorch.org/whl/cu121"
+# explicit = true
+
+# [tool.uv.sources]
+# torch = { index = "pytorch-cu121" }
+# torchvision = { index = "pytorch-cu121" }
+```
+
+Then:
+
+```bash
+git clone https://github.com/evany413/FaceLink-Organizer.git
+cd FaceLink-Organizer
+uv sync
+```
+
+On Apple Silicon, PyTorch will automatically use the **MPS** backend for GPU acceleration — no extra steps needed.
+
+**Windows / Linux with NVIDIA GPU:**
+
+1. Install the latest [NVIDIA driver](https://www.nvidia.com/drivers)
+2. Install [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads)
+3. In `pyproject.toml`, update the CUDA version in the index URL to match your installation (e.g. `cu118`, `cu121`, `cu124`) and leave the two CUDA blocks uncommented
+4. Run:
 
 ```bash
 git clone https://github.com/evany413/FaceLink-Organizer.git
@@ -66,7 +89,7 @@ uv run main.py /path/to/folders
 ## How It Works
 
 1. **Scan** — Collects all immediate subdirectories of the target path.
-2. **Extract** — Processes images and sampled video frames to generate 512-d face embeddings (Facenet512), saving results to a local cache.
+2. **Extract** — Processes images and sampled video frames to generate 512-d face embeddings (InceptionResnetV1 / vggface2), saving results to a local cache.
 3. **Match** — Computes Euclidean distance between encodings; a distance ≤ `tolerance` is considered a match.
 4. **Graph** — Each folder becomes a node; an edge is drawn between two nodes if they share at least one face.
 5. **Cluster** — `nx.connected_components()` finds all groups of directly or indirectly linked folders.
@@ -76,7 +99,8 @@ uv run main.py /path/to/folders
 
 | Role | Library |
 |---|---|
-| Face detection & embedding | `deepface` (Facenet512 + RetinaFace) |
+| Face detection & embedding | `facenet-pytorch` (MTCNN + InceptionResnetV1) |
+| GPU acceleration | PyTorch — CUDA / MPS / CPU auto-detected |
 | Video decoding | `av` (PyAV / FFmpeg) |
 | Image loading | `Pillow` |
 | Graph clustering | `networkx` |

@@ -15,6 +15,9 @@ Options:
     --dry-run           Print what would happen without moving anything
 """
 
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning, module="facenet_pytorch")
+
 import argparse
 import shutil
 from pathlib import Path

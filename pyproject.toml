@@ -6,8 +6,23 @@ readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "av>=17.0.0",
-    "deepface>=0.0.99",
+    "facenet-pytorch>=2.5.3",
     "networkx>=3.6.1",
-    "numpy>=2.4.4",
-    "tf-keras>=2.21.0",
+    "numpy>=2.4.0",
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
+    "Pillow>=10.0.0",
 ]
+
+# --- GPU (Windows / Linux CUDA) ---
+# On Mac (MPS) or CPU-only, comment out the two blocks below and run `uv sync`.
+# On Windows/Linux with NVIDIA GPU, keep them uncommented, then run `uv sync`.
+# Change "cu121" to match your installed CUDA version (e.g. cu118, cu124).
+[[tool.uv.index]]
+name = "pytorch-cu121"
+url = "https://download.pytorch.org/whl/cu121"
+explicit = true
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu121" }
+torchvision = { index = "pytorch-cu121" }

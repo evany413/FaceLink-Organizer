@@ -14,6 +14,7 @@ def encodings_from_json(data: list[list[float]]) -> list[np.ndarray]:
 def save_cache(cache: dict[str, list[np.ndarray]], cache_path: str) -> None:
     """Persist encoding cache to a JSON file."""
     serializable = {k: encodings_to_json(v) for k, v in cache.items()}
+    Path(cache_path).parent.mkdir(parents=True, exist_ok=True)
     with open(cache_path, "w", encoding="utf-8") as f:
         json.dump(serializable, f)
 

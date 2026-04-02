@@ -3,26 +3,48 @@ import hashlib
 import numpy as np
 from pathlib import Path
 from PIL import Image
-from deepface import DeepFace
+import torch
+from facenet_pytorch import MTCNN, InceptionResnetV1
 
 SUPPORTED_IMAGE_EXTS = {".jpg", ".jpeg", ".png", ".bmp", ".webp"}
 SUPPORTED_VIDEO_EXTS = {".mp4", ".mov", ".avi", ".mkv", ".wmv"}
 
-MODEL_NAME = "Facenet512"
-DETECTOR_BACKEND = "retinaface"
+FACE_CONFIDENCE_THRESHOLD = 0.6
+
+
+def _get_device() -> torch.device:
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    if torch.backends.mps.is_available():
+        return torch.device("mps")
+    return torch.device("cpu")
+
+
+_device = _get_device()
+_mtcnn = MTCNN(keep_all=True, device=_device)
+_resnet = InceptionResnetV1(pretrained="vggface2").eval().to(_device)
+
+
+def _extract_embeddings(img: Image.Image) -> list[np.ndarray]:
+    """Extract face embeddings from a PIL RGB image."""
+    faces, probs = _mtcnn(img, return_prob=True)
+    if faces is None:
+        return []
+    embeddings = []
+    with torch.no_grad():
+        for face, prob in zip(faces, probs):
+            if prob < FACE_CONFIDENCE_THRESHOLD:
+                continue
+            emb = _resnet(face.unsqueeze(0).to(_device))
+            embeddings.append(emb.squeeze().cpu().numpy())
+    return embeddings
 
 
 def get_face_encodings_from_image(image_path: str) -> list[np.ndarray]:
-    """Extract face embeddings from an image using DeepFace."""
+    """Extract face embeddings from an image."""
     try:
-        img = np.array(Image.open(image_path).convert("RGB"))
-        results = DeepFace.represent(
-            img_path=img,
-            model_name=MODEL_NAME,
-            detector_backend=DETECTOR_BACKEND,
-            enforce_detection=False,
-        )
-        return [np.array(r["embedding"]) for r in results if r["face_confidence"] > 0.6]
+        img = Image.open(image_path).convert("RGB")
+        return _extract_embeddings(img)
     except Exception as e:
         print(f"  [WARN] Image error {image_path}: {e}")
         return []
@@ -31,7 +53,7 @@ def get_face_encodings_from_image(image_path: str) -> list[np.ndarray]:
 def get_face_encodings_from_video(
     video_path: str, sample_rate: int = 30, debug_dir: str | None = None
 ) -> list[np.ndarray]:
-    """Sample frames from a video and extract face embeddings using DeepFace."""
+    """Sample frames from a video and extract face embeddings."""
     encodings = []
     frame_count = 0
 
@@ -50,19 +72,12 @@ def get_face_encodings_from_video(
     for frame in container.decode(video=0):
         if frame_count % sample_rate == 0:
             try:
-                img = frame.to_ndarray(format="bgr24")
+                img = frame.to_image().convert("RGB")
 
                 if debug_dir:
-                    Image.fromarray(img[..., ::-1]).save(debug_path / f"{stem}_f{frame_count}.jpg")
+                    img.save(debug_path / f"{stem}_f{frame_count}.jpg")
 
-                results = DeepFace.represent(
-                    img_path=img,
-                    model_name=MODEL_NAME,
-                    detector_backend=DETECTOR_BACKEND,
-                    enforce_detection=False,
-                )
-                found = [np.array(r["embedding"]) for r in results if r["face_confidence"] > 0.6]
-                encodings.extend(found)
+                encodings.extend(_extract_embeddings(img))
             except Exception:
                 pass
         frame_count += 1
