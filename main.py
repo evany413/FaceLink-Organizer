@@ -24,7 +24,7 @@ from pathlib import Path
 
 import networkx as nx
 
-from core.face import folders_share_face, load_cache, save_cache
+from core.face import folders_share_face, get_representative_encodings, load_cache, save_cache
 from core.video import get_face_encodings_from_folder
 
 
@@ -37,10 +37,9 @@ def build_encoding_map(
     cache_path: str,
     sample_rate: int,
     debug_dir: str | None = None,
-) -> dict[str, list]:
-    """Return {folder_str: [encodings]} for every sub-folder, using cache."""
+) -> tuple[dict[str, list], dict[str, list]]:
+    """Return (all_encodings, representative_encodings) for every sub-folder, using cache."""
     cache = load_cache(cache_path)
-    changed = False
 
     for folder in folders:
         key = str(folder)
@@ -52,15 +51,15 @@ def build_encoding_map(
         encodings = get_face_encodings_from_folder(key, sample_rate, debug_dir)
         print(f"{len(encodings)} face(s) found")
         cache[key] = encodings
-        changed = True
-
-    if changed:
         save_cache(cache, cache_path)
-        print(f"  Cache saved → {cache_path}\n")
 
-    # Return only entries for the current folders, ignoring stale cache paths
     current_keys = {str(f) for f in folders}
-    return {k: v for k, v in cache.items() if k in current_keys}
+    encoding_map = {k: v for k, v in cache.items() if k in current_keys}
+    repr_map = {
+        k: get_representative_encodings(v)
+        for k, v in encoding_map.items()
+    }
+    return encoding_map, repr_map
 
 
 # ---------------------------------------------------------------------------
@@ -68,18 +67,18 @@ def build_encoding_map(
 # ---------------------------------------------------------------------------
 
 def build_groups(
-    encoding_map: dict[str, list],
+    repr_map: dict[str, list],
     tolerance: float,
 ) -> list[set[str]]:
-    """Compare every pair of folders and cluster via connected components."""
-    folders = list(encoding_map.keys())
+    """Compare representative encodings of every pair of folders and cluster via connected components."""
+    folders = list(repr_map.keys())
     G = nx.Graph()
     G.add_nodes_from(folders)
 
     for i in range(len(folders)):
         for j in range(i + 1, len(folders)):
             a, b = folders[i], folders[j]
-            if folders_share_face(encoding_map[a], encoding_map[b], tolerance):
+            if folders_share_face(repr_map[a], repr_map[b], tolerance):
                 G.add_edge(a, b)
                 print(f"  [match] {Path(a).name}  <->  {Path(b).name}")
 
@@ -148,11 +147,11 @@ def main() -> None:
 
     # 1. Extract / load encodings
     print("=== Step 1: Extracting face encodings ===")
-    encoding_map = build_encoding_map(folders, args.cache, args.sample_rate, args.debug)
+    _, repr_map = build_encoding_map(folders, args.cache, args.sample_rate, args.debug)
 
     # 2. Build graph & cluster
     print("=== Step 2: Building association graph ===")
-    groups = build_groups(encoding_map, args.tolerance)
+    groups = build_groups(repr_map, args.tolerance)
 
     # 3. Move folders
     print("\n=== Step 3: Organising folders ===")

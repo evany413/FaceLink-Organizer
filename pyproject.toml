@@ -18,11 +18,11 @@ dependencies = [
 # On Mac (MPS) or CPU-only, comment out the two blocks below and run `uv sync`.
 # On Windows/Linux with NVIDIA GPU, keep them uncommented, then run `uv sync`.
 # Change "cu121" to match your installed CUDA version (e.g. cu118, cu124).
-[[tool.uv.index]]
-name = "pytorch-cu121"
-url = "https://download.pytorch.org/whl/cu121"
-explicit = true
+# [[tool.uv.index]]
+# name = "pytorch-cu121"
+# url = "https://download.pytorch.org/whl/cu121"
+# explicit = true
 
 [tool.uv.sources]
-torch = { index = "pytorch-cu121" }
-torchvision = { index = "pytorch-cu121" }
+# torch = { index = "pytorch-cu121" }
+# torchvision = { index = "pytorch-cu121" }

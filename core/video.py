@@ -11,16 +11,8 @@ SUPPORTED_VIDEO_EXTS = {".mp4", ".mov", ".avi", ".mkv", ".wmv"}
 
 FACE_CONFIDENCE_THRESHOLD = 0.6
 
-
-def _get_device() -> torch.device:
-    if torch.cuda.is_available():
-        return torch.device("cuda")
-    if torch.backends.mps.is_available():
-        return torch.device("mps")
-    return torch.device("cpu")
-
-
-_device = _get_device()
+# Choose your device: "cpu", "cuda" (NVIDIA GPU), or "mps" (Apple Silicon)
+_device = torch.device("cpu")
 _mtcnn = MTCNN(keep_all=True, device=_device)
 _resnet = InceptionResnetV1(pretrained="vggface2").eval().to(_device)
 
@@ -89,18 +81,25 @@ def get_face_encodings_from_video(
 def get_face_encodings_from_folder(
     folder_path: str, sample_rate: int = 30, debug_dir: str | None = None
 ) -> list[np.ndarray]:
-    """Scan a folder recursively and extract face encodings from all supported files."""
+    """Scan a folder recursively. Images take priority; videos are used only if no faces found in images."""
     folder = Path(folder_path)
-    all_encodings: list[np.ndarray] = []
+    encodings: list[np.ndarray] = []
 
     for file in folder.rglob("*"):
-        ext = file.suffix.lower()
-        try:
-            if ext in SUPPORTED_IMAGE_EXTS:
-                all_encodings.extend(get_face_encodings_from_image(str(file)))
-            elif ext in SUPPORTED_VIDEO_EXTS:
-                all_encodings.extend(get_face_encodings_from_video(str(file), sample_rate, debug_dir))
-        except Exception as e:
-            print(f"  [WARN] Failed to process {file}: {e}")
+        if file.suffix.lower() in SUPPORTED_IMAGE_EXTS:
+            try:
+                encodings.extend(get_face_encodings_from_image(str(file)))
+            except Exception as e:
+                print(f"  [WARN] Failed to process {file}: {e}")
 
-    return all_encodings
+    if encodings:
+        return encodings
+
+    for file in folder.rglob("*"):
+        if file.suffix.lower() in SUPPORTED_VIDEO_EXTS:
+            try:
+                encodings.extend(get_face_encodings_from_video(str(file), sample_rate, debug_dir))
+            except Exception as e:
+                print(f"  [WARN] Failed to process {file}: {e}")
+
+    return encodings

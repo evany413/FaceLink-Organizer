@@ -5,10 +5,11 @@ An intelligent file management tool that groups folders based on facial recognit
 ## Features
 
 - **Facial Feature Extraction** — Detects and encodes faces from images and video frames.
+- **Image-first Processing** — Images are scanned first; videos are only used as fallback if no faces are found in images.
+- **Representative Face** — Each folder is represented by the most frequently appearing person, reducing noise from background faces.
 - **Relational Clustering** — Uses Connected Components to link folders transitively (e.g. if Folder A and B share Person 1, and B and C share Person 2, all three end up in the same group).
 - **Structure-Preserving** — Moves entire folder structures into numbered parent directories (`001/`, `002/`, …) without altering internal content.
-- **Caching** — Face encodings are persisted to a local JSON cache to avoid redundant computation on re-runs.
-- **Video Support** — Frame-skipping keeps video processing fast (configurable sample rate).
+- **Incremental Caching** — Face encodings are saved after each folder is processed, so progress is preserved if interrupted.
 
 ## Getting Started
 
@@ -51,7 +52,12 @@ cd FaceLink-Organizer
 uv sync
 ```
 
-On Apple Silicon, PyTorch will automatically use the **MPS** backend for GPU acceleration — no extra steps needed.
+To change the compute device, edit the `_device` line in `core/video.py`:
+
+```python
+# Choose your device: "cpu", "cuda" (NVIDIA), or "mps" (Apple Silicon)
+_device = torch.device("cpu")
+```
 
 **Windows / Linux with NVIDIA GPU:**
 
@@ -90,17 +96,18 @@ uv run main.py /path/to/folders
 
 1. **Scan** — Collects all immediate subdirectories of the target path.
 2. **Extract** — Processes images and sampled video frames to generate 512-d face embeddings (InceptionResnetV1 / vggface2), saving results to a local cache.
-3. **Match** — Computes Euclidean distance between encodings; a distance ≤ `tolerance` is considered a match.
-4. **Graph** — Each folder becomes a node; an edge is drawn between two nodes if they share at least one face.
-5. **Cluster** — `nx.connected_components()` finds all groups of directly or indirectly linked folders.
-6. **Organize** — Creates `001/`, `002/`, … directories and moves each group's folders into them.
+3. **Representative** — Identifies the most frequently appearing person in each folder and uses their encoding cluster for matching.
+4. **Match** — Computes Euclidean distance between representative encodings; a distance ≤ `tolerance` is considered a match.
+5. **Graph** — Each folder becomes a node; an edge is drawn between two nodes if they share at least one face.
+6. **Cluster** — `nx.connected_components()` finds all groups of directly or indirectly linked folders.
+7. **Organize** — Creates `001/`, `002/`, … directories and moves each group's folders into them.
 
 ## Tech Stack
 
 | Role | Library |
 |---|---|
 | Face detection & embedding | `facenet-pytorch` (MTCNN + InceptionResnetV1) |
-| GPU acceleration | PyTorch — CUDA / MPS / CPU auto-detected |
+| GPU acceleration | PyTorch — configurable (`cpu` / `cuda` / `mps`) |
 | Video decoding | `av` (PyAV / FFmpeg) |
 | Image loading | `Pillow` |
 | Graph clustering | `networkx` |

@@ -29,6 +29,22 @@ def load_cache(cache_path: str) -> dict[str, list[np.ndarray]]:
     return {k: encodings_from_json(v) for k, v in raw.items()}
 
 
+def get_representative_encodings(
+    encodings: list[np.ndarray], tolerance: float = 0.5
+) -> list[np.ndarray]:
+    """Return all encodings belonging to the most frequently appearing face cluster."""
+    if not encodings:
+        return []
+    arr = np.array(encodings)
+    best_cluster: np.ndarray = arr[:0]
+    for enc in encodings:
+        distances = np.linalg.norm(arr - enc, axis=1)
+        cluster = arr[distances <= tolerance]
+        if len(cluster) > len(best_cluster):
+            best_cluster = cluster
+    return list(best_cluster)
+
+
 def folders_share_face(
     encodings_a: list[np.ndarray],
     encodings_b: list[np.ndarray],
